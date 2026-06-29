@@ -5,6 +5,40 @@
       <p>{{ t('orders.description') }}</p>
     </div>
 
+    <!-- Submitted restocking orders section -->
+    <div v-if="restockingOrders.length > 0" class="card restocking-section">
+      <div class="card-header restocking-header" @click="restockingExpanded = !restockingExpanded" style="cursor: pointer;">
+        <h3 class="card-title">Submitted Orders <span class="restocking-count">{{ restockingOrders.length }}</span></h3>
+        <span class="toggle-icon">{{ restockingExpanded ? '▲' : '▼' }}</span>
+      </div>
+      <div v-if="restockingExpanded" class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Items</th>
+              <th>Total Cost</th>
+              <th>Submitted</th>
+              <th>Expected Delivery</th>
+              <th>Lead Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in restockingOrders" :key="order.id">
+              <td><strong>{{ order.id }}</strong></td>
+              <td>{{ order.items.length }} item{{ order.items.length !== 1 ? 's' : '' }}</td>
+              <td><strong>${{ order.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></td>
+              <td>{{ formatDate(order.order_date) }}</td>
+              <td>{{ formatDate(order.expected_delivery) }}</td>
+              <td>{{ formatDeliveryLeadTime(order.order_date, order.expected_delivery) }}</td>
+              <td><span class="badge info">{{ order.status }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
@@ -95,6 +129,8 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
+    const restockingOrders = ref([])
+    const restockingExpanded = ref(true)
 
     // Use shared filters
     const {
@@ -104,6 +140,14 @@ export default {
       selectedStatus,
       getCurrentFilters
     } = useFilters()
+
+    const loadRestockingOrders = async () => {
+      try {
+        restockingOrders.value = await api.getRestockingOrders()
+      } catch (err) {
+        console.error('Failed to load restocking orders:', err)
+      }
+    }
 
     const loadOrders = async () => {
       try {
@@ -153,7 +197,17 @@ export default {
       })
     }
 
-    onMounted(loadOrders)
+    const formatDeliveryLeadTime = (orderDate, expectedDelivery) => {
+      const start = new Date(orderDate)
+      const end = new Date(expectedDelivery)
+      const days = Math.round((end - start) / (1000 * 60 * 60 * 24))
+      return `${days} days`
+    }
+
+    onMounted(() => {
+      loadOrders()
+      loadRestockingOrders()
+    })
 
     return {
       t,
@@ -163,9 +217,12 @@ export default {
       getOrdersByStatus,
       getOrderStatusClass,
       formatDate,
+      formatDeliveryLeadTime,
       currencySymbol,
       translateProductName,
-      translateCustomerName
+      translateCustomerName,
+      restockingOrders,
+      restockingExpanded
     }
   }
 }
@@ -274,6 +331,39 @@ export default {
 
 .item-meta {
   font-size: 0.813rem;
+  color: #64748b;
+}
+
+.restocking-section {
+  border-left: 3px solid #2563eb;
+  margin-bottom: 1.25rem;
+}
+
+.restocking-header {
+  user-select: none;
+}
+
+.restocking-header:hover {
+  background: #f8fafc;
+  border-radius: 10px 10px 0 0;
+}
+
+.restocking-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 0 8px;
+  height: 20px;
+  margin-left: 8px;
+}
+
+.toggle-icon {
+  font-size: 0.75rem;
   color: #64748b;
 }
 </style>
